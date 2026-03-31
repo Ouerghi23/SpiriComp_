@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html>
+<head>
+    
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.js"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="https://netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap-glyphicons.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.2.0/css/all.min.css"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/python-visualization/folium/folium/templates/leaflet.awesome.rotate.min.css"/>
+    
+            <meta name="viewport" content="width=device-width,
+                initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+            <style>
+                #map_f185c4b392faf2431be24238bf1d62bc {
+                    position: relative;
+                    width: 100.0%;
+                    height: 100.0%;
+                    left: 0.0%;
+                    top: 0.0%;
+                }
+                .leaflet-container { font-size: 1rem; }
+            </style>
+
+            <style>html, body {
+                width: 100%;
+                height: 100%;
+                margin: 0;
+                padding: 0;
+            }
+            </style>
+
+            <style>#map {
+                position:absolute;
+                top:0;
+                bottom:0;
+                right:0;
+                left:0;
+                }
+            </style>
+
+            <script>
+                L_NO_TOUCH = false;
+                L_DISABLE_3D = false;
+            </script>
+
+        
+</head>
+<body>
+    
+    
+            <div style="position:fixed;bottom:30px;left:30px;
+                        background:rgba(0,0,0,0.7);padding:12px;
+                        border-radius:8px;color:white;font-size:12px;">
+              <b>QoE Colour Scale</b><br>
+              <span style="color:#2ecc71">●</span> Good (≥ 80)<br>
+              <span style="color:#f39c12">●</span> Fair (60–79)<br>
+              <span style="color:#e74c3c">●</span> Poor (< 60)<br>
+              <i>Circle size = complaint volume</i>
+            </div>
+    
+            <div class="folium-map" id="map_f185c4b392faf2431be24238bf1d62bc" ></div>
+        
+</body>
+<script>
+    
+    
+            var map_f185c4b392faf2431be24238bf1d62bc = L.map(
+                "map_f185c4b392faf2431be24238bf1d62bc",
+                {
+                    center: [35.5, 10.0],
+                    crs: L.CRS.EPSG3857,
+                    ...{
+  "zoom": 7,
+  "zoomControl": true,
+  "preferCanvas": false,
+}
+
+                }
+            );
+
+            
+
+        
+    
+            var tile_layer_d662ecd9f96c4ead7e1bbfa9faa84c98 = L.tileLayer(
+                "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+                {
+  "minZoom": 0,
+  "maxZoom": 20,
+  "maxNativeZoom": 20,
+  "noWrap": false,
+  "attribution": "\u0026copy; \u003ca href=\"https://www.openstreetmap.org/copyright\"\u003eOpenStreetMap\u003c/a\u003e contributors \u0026copy; \u003ca href=\"https://carto.com/attributions\"\u003eCARTO\u003c/a\u003e",
+  "subdomains": "abcd",
+  "detectRetina": false,
+  "tms": false,
+  "opacity": 1,
+}
+
+            );
+        
+    
+            tile_layer_d662ecd9f96c4ead7e1bbfa9faa84c98.addTo(map_f185c4b392faf2431be24238bf1d62bc);
+        
+    
+            var circle_marker_bbbcf8629e2dcdf1dff718dc8503f3d6 = L.circleMarker(
+                [35.825, 10.638],
+                {"bubblingMouseEvents": true, "color": "#f39c12", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#f39c12", "fillOpacity": 0.55, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 55.0, "stroke": true, "weight": 2}
+            ).addTo(map_f185c4b392faf2431be24238bf1d62bc);
+        
+    
+            circle_marker_bbbcf8629e2dcdf1dff718dc8503f3d6.bindTooltip(
+                `<div>
+                     <b>Sousse</b><br>Complaints: 5,076<br>QoE: 65.6<br>Dominant: Intermittent Connection
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var marker_f437387d1668979f78b9682d91b54dfc = L.marker(
+                [35.825, 10.638],
+                {
+}
+            ).addTo(map_f185c4b392faf2431be24238bf1d62bc);
+        
+    
+            var div_icon_b938073649e676b70f53378617508ffe = L.divIcon({
+  "html": "\u003cdiv style=\"font-size:9px;color:white;font-weight:bold;text-align:center;text-shadow:1px 1px 2px black;\"\u003eSousse\u003cbr\u003e5,076\u003c/div\u003e",
+  "iconSize": [75, 28],
+  "iconAnchor": [37, 14],
+  "className": "empty",
+});
+        
+    
+                marker_f437387d1668979f78b9682d91b54dfc.setIcon(div_icon_b938073649e676b70f53378617508ffe);
+            
+    
+            var circle_marker_fa79b9ca43b8984a7cd26207a806b6fa = L.circleMarker(
+                [36.862, 10.193],
+                {"bubblingMouseEvents": true, "color": "#f39c12", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#f39c12", "fillOpacity": 0.55, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 54.84239558707644, "stroke": true, "weight": 2}
+            ).addTo(map_f185c4b392faf2431be24238bf1d62bc);
+        
+    
+            circle_marker_fa79b9ca43b8984a7cd26207a806b6fa.bindTooltip(
+                `<div>
+                     <b>Ariana</b><br>Complaints: 5,056<br>QoE: 65.6<br>Dominant: Intermittent Connection
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var marker_c2fe6d6af621d78612667af9071c075b = L.marker(
+                [36.862, 10.193],
+                {
+}
+            ).addTo(map_f185c4b392faf2431be24238bf1d62bc);
+        
+    
+            var div_icon_b1d2a59f13c0c369e2c4a019e52f0664 = L.divIcon({
+  "html": "\u003cdiv style=\"font-size:9px;color:white;font-weight:bold;text-align:center;text-shadow:1px 1px 2px black;\"\u003eAriana\u003cbr\u003e5,056\u003c/div\u003e",
+  "iconSize": [75, 28],
+  "iconAnchor": [37, 14],
+  "className": "empty",
+});
+        
+    
+                marker_c2fe6d6af621d78612667af9071c075b.setIcon(div_icon_b1d2a59f13c0c369e2c4a019e52f0664);
+            
+    
+            var circle_marker_92f0a8d61cb3f36c0548ff05ce988eae = L.circleMarker(
+                [35.777, 10.826],
+                {"bubblingMouseEvents": true, "color": "#f39c12", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#f39c12", "fillOpacity": 0.55, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 54.79511426319937, "stroke": true, "weight": 2}
+            ).addTo(map_f185c4b392faf2431be24238bf1d62bc);
+        
+    
+            circle_marker_92f0a8d61cb3f36c0548ff05ce988eae.bindTooltip(
+                `<div>
+                     <b>Monastir</b><br>Complaints: 5,050<br>QoE: 65.7<br>Dominant: Intermittent Connection
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var marker_4b163492147cacfa5d0412b4fe9d376b = L.marker(
+                [35.777, 10.826],
+                {
+}
+            ).addTo(map_f185c4b392faf2431be24238bf1d62bc);
+        
+    
+            var div_icon_fe0522edd711ef760159e378263f027d = L.divIcon({
+  "html": "\u003cdiv style=\"font-size:9px;color:white;font-weight:bold;text-align:center;text-shadow:1px 1px 2px black;\"\u003eMonastir\u003cbr\u003e5,050\u003c/div\u003e",
+  "iconSize": [75, 28],
+  "iconAnchor": [37, 14],
+  "className": "empty",
+});
+        
+    
+                marker_4b163492147cacfa5d0412b4fe9d376b.setIcon(div_icon_fe0522edd711ef760159e378263f027d);
+            
+    
+            var circle_marker_6e75567420938729460e17d9db0a5ef4 = L.circleMarker(
+                [37.275, 9.873],
+                {"bubblingMouseEvents": true, "color": "#f39c12", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#f39c12", "fillOpacity": 0.55, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 54.51142631993696, "stroke": true, "weight": 2}
+            ).addTo(map_f185c4b392faf2431be24238bf1d62bc);
+        
+    
+            circle_marker_6e75567420938729460e17d9db0a5ef4.bindTooltip(
+                `<div>
+                     <b>Bizerte</b><br>Complaints: 5,014<br>QoE: 65.7<br>Dominant: Intermittent Connection
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var marker_6e1a72dded55e7ecd3b1955eb3adbae2 = L.marker(
+                [37.275, 9.873],
+                {
+}
+            ).addTo(map_f185c4b392faf2431be24238bf1d62bc);
+        
+    
+            var div_icon_ceebe76a1b76870def49e038046a8a8f = L.divIcon({
+  "html": "\u003cdiv style=\"font-size:9px;color:white;font-weight:bold;text-align:center;text-shadow:1px 1px 2px black;\"\u003eBizerte\u003cbr\u003e5,014\u003c/div\u003e",
+  "iconSize": [75, 28],
+  "iconAnchor": [37, 14],
+  "className": "empty",
+});
+        
+    
+                marker_6e1a72dded55e7ecd3b1955eb3adbae2.setIcon(div_icon_ceebe76a1b76870def49e038046a8a8f);
+            
+    
+            var circle_marker_4f4bf61a9f1bf9955c43a66bf428cdea = L.circleMarker(
+                [34.74, 10.76],
+                {"bubblingMouseEvents": true, "color": "#f39c12", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#f39c12", "fillOpacity": 0.55, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 54.41686367218282, "stroke": true, "weight": 2}
+            ).addTo(map_f185c4b392faf2431be24238bf1d62bc);
+        
+    
+            circle_marker_4f4bf61a9f1bf9955c43a66bf428cdea.bindTooltip(
+                `<div>
+                     <b>Sfax</b><br>Complaints: 5,002<br>QoE: 65.7<br>Dominant: Intermittent Connection
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var marker_09e2d09ab491196c391258ee1aae4ac1 = L.marker(
+                [34.74, 10.76],
+                {
+}
+            ).addTo(map_f185c4b392faf2431be24238bf1d62bc);
+        
+    
+            var div_icon_049d94dd87f03f24fbc235998f52f2b5 = L.divIcon({
+  "html": "\u003cdiv style=\"font-size:9px;color:white;font-weight:bold;text-align:center;text-shadow:1px 1px 2px black;\"\u003eSfax\u003cbr\u003e5,002\u003c/div\u003e",
+  "iconSize": [75, 28],
+  "iconAnchor": [37, 14],
+  "className": "empty",
+});
+        
+    
+                marker_09e2d09ab491196c391258ee1aae4ac1.setIcon(div_icon_049d94dd87f03f24fbc235998f52f2b5);
+            
+    
+            var circle_marker_18367425988daf67878ab368c4b1809c = L.circleMarker(
+                [35.671, 10.1],
+                {"bubblingMouseEvents": true, "color": "#f39c12", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#f39c12", "fillOpacity": 0.55, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 54.40110323089046, "stroke": true, "weight": 2}
+            ).addTo(map_f185c4b392faf2431be24238bf1d62bc);
+        
+    
+            circle_marker_18367425988daf67878ab368c4b1809c.bindTooltip(
+                `<div>
+                     <b>Kairouan</b><br>Complaints: 5,000<br>QoE: 65.7<br>Dominant: Intermittent Connection
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var marker_1e8d1b7a13d0edcb720b35245a25903a = L.marker(
+                [35.671, 10.1],
+                {
+}
+            ).addTo(map_f185c4b392faf2431be24238bf1d62bc);
+        
+    
+            var div_icon_aa3f3811e9c6d1b73f1a1f83dd22a690 = L.divIcon({
+  "html": "\u003cdiv style=\"font-size:9px;color:white;font-weight:bold;text-align:center;text-shadow:1px 1px 2px black;\"\u003eKairouan\u003cbr\u003e5,000\u003c/div\u003e",
+  "iconSize": [75, 28],
+  "iconAnchor": [37, 14],
+  "className": "empty",
+});
+        
+    
+                marker_1e8d1b7a13d0edcb720b35245a25903a.setIcon(div_icon_aa3f3811e9c6d1b73f1a1f83dd22a690);
+            
+    
+            var circle_marker_7580c5668374b1a0c3bca5070e2f74da = L.circleMarker(
+                [36.753, 10.228],
+                {"bubblingMouseEvents": true, "color": "#f39c12", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#f39c12", "fillOpacity": 0.55, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 54.369582348305755, "stroke": true, "weight": 2}
+            ).addTo(map_f185c4b392faf2431be24238bf1d62bc);
+        
+    
+            circle_marker_7580c5668374b1a0c3bca5070e2f74da.bindTooltip(
+                `<div>
+                     <b>Ben Arous</b><br>Complaints: 4,996<br>QoE: 65.6<br>Dominant: Intermittent Connection
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var marker_2903206e8c4a3dde9ae3c1ac7870b94f = L.marker(
+                [36.753, 10.228],
+                {
+}
+            ).addTo(map_f185c4b392faf2431be24238bf1d62bc);
+        
+    
+            var div_icon_90540424ee3b6d4d3b81c1ddccf1319f = L.divIcon({
+  "html": "\u003cdiv style=\"font-size:9px;color:white;font-weight:bold;text-align:center;text-shadow:1px 1px 2px black;\"\u003eBen Arous\u003cbr\u003e4,996\u003c/div\u003e",
+  "iconSize": [75, 28],
+  "iconAnchor": [37, 14],
+  "className": "empty",
+});
+        
+    
+                marker_2903206e8c4a3dde9ae3c1ac7870b94f.setIcon(div_icon_90540424ee3b6d4d3b81c1ddccf1319f);
+            
+    
+            var circle_marker_0a4cc450d255c32489f86fbd2fa04c2e = L.circleMarker(
+                [33.881, 10.097],
+                {"bubblingMouseEvents": true, "color": "#f39c12", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#f39c12", "fillOpacity": 0.55, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 54.148936170212764, "stroke": true, "weight": 2}
+            ).addTo(map_f185c4b392faf2431be24238bf1d62bc);
+        
+    
+            circle_marker_0a4cc450d255c32489f86fbd2fa04c2e.bindTooltip(
+                `<div>
+                     <b>Gabes</b><br>Complaints: 4,968<br>QoE: 65.7<br>Dominant: No Service
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var marker_86c87cd0a47c186cf77b1a9e985c6378 = L.marker(
+                [33.881, 10.097],
+                {
+}
+            ).addTo(map_f185c4b392faf2431be24238bf1d62bc);
+        
+    
+            var div_icon_366dd229bb0db820b2462ef9b7a23cee = L.divIcon({
+  "html": "\u003cdiv style=\"font-size:9px;color:white;font-weight:bold;text-align:center;text-shadow:1px 1px 2px black;\"\u003eGabes\u003cbr\u003e4,968\u003c/div\u003e",
+  "iconSize": [75, 28],
+  "iconAnchor": [37, 14],
+  "className": "empty",
+});
+        
+    
+                marker_86c87cd0a47c186cf77b1a9e985c6378.setIcon(div_icon_366dd229bb0db820b2462ef9b7a23cee);
+            
+    
+            var circle_marker_2993e84922aa34f5b0c37bec39659453 = L.circleMarker(
+                [34.422, 8.784],
+                {"bubblingMouseEvents": true, "color": "#f39c12", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#f39c12", "fillOpacity": 0.55, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 53.983451536643024, "stroke": true, "weight": 2}
+            ).addTo(map_f185c4b392faf2431be24238bf1d62bc);
+        
+    
+            circle_marker_2993e84922aa34f5b0c37bec39659453.bindTooltip(
+                `<div>
+                     <b>Gafsa</b><br>Complaints: 4,947<br>QoE: 65.6<br>Dominant: No Service
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var marker_43c1894637b5b1cc3d4b6e030361ef52 = L.marker(
+                [34.422, 8.784],
+                {
+}
+            ).addTo(map_f185c4b392faf2431be24238bf1d62bc);
+        
+    
+            var div_icon_e80d7be20a930d5ae37c38d7c5e8b5f8 = L.divIcon({
+  "html": "\u003cdiv style=\"font-size:9px;color:white;font-weight:bold;text-align:center;text-shadow:1px 1px 2px black;\"\u003eGafsa\u003cbr\u003e4,947\u003c/div\u003e",
+  "iconSize": [75, 28],
+  "iconAnchor": [37, 14],
+  "className": "empty",
+});
+        
+    
+                marker_43c1894637b5b1cc3d4b6e030361ef52.setIcon(div_icon_e80d7be20a930d5ae37c38d7c5e8b5f8);
+            
+    
+            var circle_marker_26a91b3c6d3cca895d708b041d82f462 = L.circleMarker(
+                [36.818, 10.165],
+                {"bubblingMouseEvents": true, "color": "#f39c12", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "#f39c12", "fillOpacity": 0.55, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "opacity": 1.0, "radius": 53.54215918045705, "stroke": true, "weight": 2}
+            ).addTo(map_f185c4b392faf2431be24238bf1d62bc);
+        
+    
+            circle_marker_26a91b3c6d3cca895d708b041d82f462.bindTooltip(
+                `<div>
+                     <b>Tunis</b><br>Complaints: 4,891<br>QoE: 65.7<br>Dominant: Intermittent Connection
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+            var marker_f5d7fe8c2b8eb29beab4d8e160bc7216 = L.marker(
+                [36.818, 10.165],
+                {
+}
+            ).addTo(map_f185c4b392faf2431be24238bf1d62bc);
+        
+    
+            var div_icon_a379e46eab548ea6405800e875d7636d = L.divIcon({
+  "html": "\u003cdiv style=\"font-size:9px;color:white;font-weight:bold;text-align:center;text-shadow:1px 1px 2px black;\"\u003eTunis\u003cbr\u003e4,891\u003c/div\u003e",
+  "iconSize": [75, 28],
+  "iconAnchor": [37, 14],
+  "className": "empty",
+});
+        
+    
+                marker_f5d7fe8c2b8eb29beab4d8e160bc7216.setIcon(div_icon_a379e46eab548ea6405800e875d7636d);
+            
+</script>
+</html>

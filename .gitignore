@@ -1,0 +1,13 @@
+# Python
+__pycache__/
+*.pyc
+
+# Data
+*.csv
+data/
+
+# ML models
+*.pkl
+*.parquet
+# Env
+.env

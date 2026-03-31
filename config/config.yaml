@@ -1,0 +1,95 @@
+project:
+  name: "Huawei Telecom Complaint Analytics & Network Intelligence"
+  version: "1.0.0"
+  author: "Ouerghi Chaima"
+  institution: "TEK-UP"
+  supervisor: "Wahbi Ben Khaled "
+
+paths:
+  raw_data: "data/raw"
+  processed_data: "data/processed"
+  synthetic_data: "data/synthetic"  
+  reports: "reports"
+  figures: "reports/figures"
+  mlflow_tracking: "mlruns"
+  models: "src/models"  # <-- Assurez-vous que cette ligne existe
+
+
+data:
+  complaint_file: "complaints.csv"
+  kpi_file: "kpi_data.csv"
+  date_format: "%Y-%m-%d %H:%M:%S"
+  # Geographic coverage
+  regions:
+    - "Tunis"
+    - "Sfax"
+    - "Sousse"
+    - "Kairouan"
+    - "Bizerte"
+    - "Gabes"
+    - "Ariana"
+    - "Gafsa"
+    - "Monastir"
+    - "Ben Arous"
+  service_types:
+    - "Data"
+    - "Voice"
+    - "SMS"
+  complaint_categories:
+    - "No Service"
+    - "Slow Data"
+    - "Call Drop"
+    - "Call Setup Failure"
+    - "SMS Failure"
+    - "Poor Voice Quality"
+    - "Intermittent Connection"
+    - "Roaming Issue"
+
+features:
+  lag_windows: [1, 3, 7, 14]       # days for lag features
+  rolling_windows: [3, 7, 14, 30]  # days for rolling averages
+  kpi_columns:
+    data:
+      - "dl_throughput_mbps"
+      - "ul_throughput_mbps"
+      - "latency_ms"
+      - "packet_loss_pct"
+      - "data_session_success_rate"
+      - "data_qoe_score"
+    voice:
+      - "call_setup_success_rate"
+      - "call_drop_rate"
+      - "voice_quality_score_mos"
+      - "handover_success_rate"
+      - "voice_qoe_score"
+
+qoe:
+  weights:
+    data_qoe_score: 0.40
+    voice_qoe_score: 0.35
+    sms_success_rate: 0.25
+  thresholds:
+    green: 80
+    yellow: 60
+    red: 0
+
+models:
+  random_state: 42
+  test_size: 0.20
+  anomaly_contamination: 0.05
+  clustering_k_range: [2, 10]
+  forecast_horizon_days: 7
+
+api:
+  host: "0.0.0.0"
+  port: 8000
+  reload: true
+
+dashboard:
+  port: 8501
+  title: "Telecom NOC Intelligence Dashboard"
+  theme: "dark"
+
+mlflow:
+  experiment_name: "huawei-pfe-experiments"
+  tracking_uri: "mlruns"
