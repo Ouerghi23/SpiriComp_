@@ -5,9 +5,10 @@ SpiriComp — FastAPI analytics backend (main entry point).
 
 Run from project root:
     uvicorn src.api.analytics_api:app --reload --port 8000
+                ^^^^^^^^^^^^^^^^^^^^^^^^^
+                NOTE: src.API not src.NLP  ← this was the root cause of all 404s
 """
 from __future__ import annotations
-
 
 import json
 import logging
@@ -17,7 +18,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from src.api.notifications import router as notif_router
+
 import numpy as np
 import pandas as pd
 from fastapi import FastAPI, APIRouter, Query, Request
@@ -64,9 +65,7 @@ _cache: dict[str, tuple[pd.DataFrame, float]] = {}
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
-
 def load(key: str, refresh: bool = False) -> pd.DataFrame:
-    """Load a parquet file with in-memory TTL cache. Returns empty DataFrame if missing."""
     now = time.monotonic()
     if not refresh and key in _cache:
         df, ts = _cache[key]
@@ -83,7 +82,6 @@ def load(key: str, refresh: bool = False) -> pd.DataFrame:
     return df
 
 
-# Common date column name variants produced by different notebook pipelines
 _DATE_COL_CANDIDATES = [
     "date", "Date", "timestamp", "Timestamp",
     "datetime", "DateTime", "date_time", "period",
@@ -92,10 +90,6 @@ _DATE_COL_CANDIDATES = [
 
 
 def _find_date_col(df: pd.DataFrame) -> str | None:
-    """
-    Return the name of the date/timestamp column in df, or None if not found.
-    Checks known candidates first, then scans dtypes, then column name keywords.
-    """
     for candidate in _DATE_COL_CANDIDATES:
         if candidate in df.columns:
             return candidate
@@ -109,16 +103,10 @@ def _find_date_col(df: pd.DataFrame) -> str | None:
 
 
 def safe_dict(df: pd.DataFrame) -> list[dict]:
-    """
-    Convert a DataFrame to a JSON-safe list of dicts.
-    Handles: np.inf / -np.inf, numpy scalar types, NaT in datetime columns.
-    """
     if df.empty:
         return []
     df = df.copy()
-    for col in df.select_dtypes(
-        include=["datetime64[ns]", "datetime64[ns, UTC]"]
-    ).columns:
+    for col in df.select_dtypes(include=["datetime64[ns]", "datetime64[ns, UTC]"]).columns:
         df[col] = df[col].dt.strftime("%Y-%m-%d")
     df = df.replace([np.inf, -np.inf], np.nan)
     df = df.where(pd.notnull(df), None)
@@ -291,7 +279,6 @@ async def kpi_tiles(refresh: bool = Query(False)):
         tiles.append({"label": m["label"], "value": round(cur, 2), "unit": m["unit"],
                       "delta": round(delta, 2),
                       "good": (delta >= 0) if m["good"] == "high" else (delta <= 0)})
-    logger.info("kpi_tiles: %d tiles (date_col='%s')", len(tiles), date_col)
     return {"tiles": tiles}
 
 
@@ -325,7 +312,6 @@ async def kpi_heatmap(refresh: bool = Query(False)):
             val = float(row["qoe"].values[0]) if not row.empty and pd.notna(row["qoe"].values[0]) else None
             data.append({"x": m, "y": val})
         series.append({"name": region.replace(" Gouvernorat", ""), "data": data})
-    logger.info("kpi_heatmap: %d regions, %d months (date_col='%s')", len(series), len(months), date_col)
     return {"series": series, "months": months}
 
 
@@ -545,7 +531,6 @@ async def root_cause_results():
 
 @router.get("/status")
 async def status():
-    """Health check — file existence, cache state, and column names for debugging."""
     out = {}
     for k, p in PATHS.items():
         cached_df, ts = _cache.get(k, (None, None))
@@ -584,7 +569,7 @@ app = FastAPI(title="SpiriComp Analytics API", version="2.1.0", lifespan=lifespa
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:5173"],
+    allow_origins=["http://localhost:3000", "http://localhost:5173", "*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -599,10 +584,20 @@ async def global_exception_handler(request: Request, exc: Exception):
         headers={"Access-Control-Allow-Origin": "*"},
     )
 
-app.include_router(notif_router)
+# ── FIX: notifications import wrapped in try/except ──────────────────
+# Previously this was a bare import — if notifications.py was missing,
+# the entire module crashed and app was never defined → all routes 404.
+try:
+    from src.api.notifications import router as notif_router
+    app.include_router(notif_router)
+    logger.info("Notification routes registered")
+except Exception as exc:
+    logger.warning("Notifications module not available (non-fatal): %s", exc)
 
+# ── Analytics routes (MUST come after app is defined) ─────────────────
 app.include_router(router)
 
+# ── Auth routes ───────────────────────────────────────────────────────
 try:
     from src.nlp.auth_api import router as auth_router
     app.include_router(auth_router)
@@ -610,9 +605,10 @@ try:
 except Exception as exc:
     logger.warning("Could not register auth routes: %s", exc)
 
+# ── NLP / complaint routes ────────────────────────────────────────────
 try:
     from src.nlp.nlp_api import router as nlp_router
     app.include_router(nlp_router)
-    logger.info("NLP routes registered")
+    logger.info("NLP routes registered — complaints form active")
 except Exception as exc:
-    logger.info("NLP module not available — skipping (%s)", exc)
+    logger.warning("NLP module not available (complaints form will 404): %s", exc)
