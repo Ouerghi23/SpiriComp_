@@ -19,8 +19,6 @@ jobs:
         with:
           python-version: '3.11'
 
-      # Installe directement — PAS de requirements.txt
-      # (mlflow==2.13.0 conflict avec pyarrow==16 dans ton requirements.txt)
       - name: Install backend dependencies
         run: |
           pip install --upgrade pip
@@ -65,7 +63,7 @@ jobs:
         run: |
           python -c "
           import sys; sys.path.insert(0, '.')
-          from src.nlp.analytics_api import app
+          from src.api.analytics_api import app
           print('FastAPI OK —', len(app.routes), 'routes registered')
           "
 
@@ -79,19 +77,20 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          # PAS de cache npm — évite l'erreur "lock file not found"
 
-      - name: Install npm dependencies
+      - name: Install all npm dependencies
         working-directory: ./compspirit
-        # npm install au lieu de npm ci
-        # (npm ci exige package-lock.json — peut être absent du repo)
-        run: npm install
+        run: npm install --legacy-peer-deps
+
+      - name: Fix node-releases for PostCSS/autoprefixer
+        working-directory: ./compspirit
+        run: npm install node-releases browserslist autoprefixer --legacy-peer-deps
 
       - name: Build React app
         working-directory: ./compspirit
         run: |
-         chmod +x node_modules/.bin/vite
-         npm run build
+          chmod +x node_modules/.bin/vite
+          npx vite build
         env:
           VITE_API_URL: http://localhost:8000
 
