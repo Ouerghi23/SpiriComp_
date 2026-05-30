@@ -52,6 +52,8 @@ jobs:
           from src.nlp.analytics_api import app
           print('FastAPI OK —', len(app.routes), 'routes')
           "
+      - name: Run pytest
+        run: pytest tests/ -v --tb=short
 
       - name: NLP routes test
         run: |
