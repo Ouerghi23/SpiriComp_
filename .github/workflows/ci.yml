@@ -54,8 +54,10 @@ jobs:
           print('FastAPI OK —', len(app.routes), 'routes')
           "
       - name: Run pytest
-        run: pytest tests/ -v --tb=short
-
+        env:
+         PYTHONPATH: .
+        run: pytest src/tests/ -v --tb=short
+        
       - name: NLP routes test
         run: |
           python -c "
