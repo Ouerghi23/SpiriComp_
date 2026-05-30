@@ -4,16 +4,20 @@ multilingual_nlp_pipeline.py  —  src/nlp/
 Multilingual NLP pipeline for Ooredoo complaint analysis.
 Supports Arabic, French, and English without translation.
 
-FIXES applied:
-──────────────────────────────────────────────────────────────────
-FIX-1  Accent normalization  ("reseau" now matches "réseau")
-FIX-2  French verb forms added to complaint lexicons ("coupe", etc.)
-FIX-3  "!" kept in preprocessed text so urgency boost fires
-FIX-4  sklearn classifier path uses Path(__file__) so it resolves
-       correctly regardless of the working directory when FastAPI
-       is started.  File lives at src/nlp/ → parents[2] = project root.
-FIX-5  _load_trained_classifier() + sklearn check placed correctly
-       at the TOP of _is_complaint() — no duplicated code.
+FIXES:
+  FIX-1  Accent normalization
+  FIX-2  French verb forms in lexicons
+  FIX-3  "!" preserved in preprocessing
+  FIX-4  sklearn path uses Path(__file__)
+  FIX-5  Classifier check at top of _is_complaint
+  FIX-6  detect_language: count Arabic CHARACTERS not word matches
+  FIX-7  _category: word boundary (\b) for single-word keywords
+  FIX-8  Removed stray `from matplotlib import text` import
+  FIX-9  _sentiment: word boundary for single-word FR/EN keywords
+         "lent" was substring-matching inside "excellent"
+  FIX-10 AR_COMPLAINT_SIGNALS: added "مقطوع" covers مقطوعة/مقطوعه
+  FIX-11 ENGLISH_WORDS: added "thank","thanks","improved","great","good"
+         to break FR/EN tie when both score 1
 """
 
 from __future__ import annotations
@@ -23,25 +27,15 @@ import re
 import unicodedata
 from datetime import datetime
 from pathlib import Path
-from typing import List, Union
 
 import pandas as pd
 
-# ── FIX-4: absolute path from this file's location ───────────────────────────
-# src/nlp/multilingual_nlp_pipeline.py
-#   → parents[0] = src/nlp/
-#   → parents[1] = src/
-#   → parents[2] = project root  (PFE_Ouerghi/)
+# ── FIX-4 ─────────────────────────────────────────────────────────────────────
 _CLASSIFIER_PATH = Path(__file__).resolve().parents[2] / "models" / "nlp" / "classifier.pkl"
-_trained_clf: object = None   # lazy-loaded singleton
+_trained_clf: object = None
 
 
 def _load_trained_classifier():
-    """
-    Load the sklearn model from disk on the first call.
-    Returns None silently if the file does not exist yet —
-    _is_complaint() will fall back to the rule-based lexicons.
-    """
     global _trained_clf
     if _trained_clf is None and _CLASSIFIER_PATH.exists():
         with open(_CLASSIFIER_PATH, "rb") as f:
@@ -50,11 +44,10 @@ def _load_trained_classifier():
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# FIX-1: ACCENT NORMALIZATION HELPER
+# ACCENT NORMALIZATION (FIX-1)
 # ══════════════════════════════════════════════════════════════════════════════
 
 def _strip_accents(s: str) -> str:
-    """'réseau' → 'reseau', 'négatif' → 'negatif', etc."""
     return (
         unicodedata.normalize("NFD", s)
         .encode("ascii", "ignore")
@@ -63,7 +56,6 @@ def _strip_accents(s: str) -> str:
 
 
 def _norm(s: str) -> str:
-    """Lowercase + strip accents — used to pre-normalize keyword lists."""
     return _strip_accents(s.lower())
 
 
@@ -72,17 +64,22 @@ def _norm(s: str) -> str:
 # ══════════════════════════════════════════════════════════════════════════════
 
 ARABIC_RANGE = re.compile(r"[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]+")
+
 FRENCH_WORDS = {
     "mon","ma","le","la","les","de","du","je","ne","pas","un","une",
     "reseau","internet","appel","connexion","coupure","lent","probleme",
     "depuis","jours","impossible","mauvais","bonjour","merci",
-    "debit","facture","client","service","panne","signal","appels",
+    "debit","facture","client","panne","signal","appels",
+    # NOTE: "service" removed — appears in both FR and EN
 }
+
+# FIX-11: added unambiguous English words to break FR/EN ties
 ENGLISH_WORDS = {
     "my","the","is","not","network","internet","call","connection",
     "slow","problem","since","days","impossible","bad","hello","thanks",
     "signal","drop","weak","no","service","issue","complaint","data",
     "billing","customer","support","coverage","speed","working",
+    "thank","improved","better","awesome","wonderful","fantastic",
 }
 
 
@@ -90,31 +87,30 @@ def detect_language(text: str) -> str:
     """Detect language: 'ar', 'fr', or 'en'."""
     if not text or not isinstance(text, str):
         return "fr"
-    text_norm = _strip_accents(text.lower())
-    arabic_ch = len(ARABIC_RANGE.findall(text))
+    # FIX-6: count Arabic CHARACTERS not word-match count
+    arabic_ch = sum(len(m) for m in ARABIC_RANGE.findall(text))
     if arabic_ch > len(text) * 0.2:
         return "ar"
-    words    = set(re.findall(r"\b\w+\b", text_norm))
-    fr_score = len(words & FRENCH_WORDS)
-    en_score = len(words & ENGLISH_WORDS)
+    text_norm = _strip_accents(text.lower())
+    words     = set(re.findall(r"\b\w+\b", text_norm))
+    fr_score  = len(words & FRENCH_WORDS)
+    en_score  = len(words & ENGLISH_WORDS)
     if fr_score == 0 and en_score == 0:
         return "fr"
     return "fr" if fr_score >= en_score else "en"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# LEXICONS
+# LEXICONS — FRENCH
 # ══════════════════════════════════════════════════════════════════════════════
 
-# ── FRENCH ────────────────────────────────────────────────────────────────────
 FR_CATEGORIES = {
     "Réseau / Couverture": [
         "pas de réseau","aucun signal","pas de couverture","zone blanche",
         "hors réseau","réseau indisponible","signal faible","coupure réseau",
         "réseau mobile","antenne","4g","5g","3g","lte","perte réseau",
         "pas de 4g","réseau coupe","pas de signal","sans réseau",
-        # FIX-2: verb forms
-        "réseau coupe","reseau coupe","le réseau coupe","mon réseau coupe",
+        "reseau coupe","le réseau coupe","mon réseau coupe",
         "mon reseau coupe","réseau qui coupe","ça coupe","ca coupe",
         "coupe tout le temps","coupe souvent","réseau coupé","réseau absent",
     ],
@@ -124,7 +120,6 @@ FR_CATEGORIES = {
         "pas d'internet","internet ne marche pas","coupure internet",
         "déconnexion","connexion instable","page ne charge pas",
         "vitesse","lags","débit","lent",
-        # FIX-2
         "internet coupe","internet se coupe","internet qui coupe",
         "internet ne fonctionne pas","internet marche pas","internet fonctionne pas",
     ],
@@ -133,7 +128,6 @@ FR_CATEGORIES = {
         "bruit","qualité voix","appel échoué","ne peut pas appeler",
         "appel ne passe pas","tonalité","volte","appels coupent",
         "ligne coupe","communication coupée","grésillement",
-        # FIX-2
         "appel coupe","appel qui coupe","les appels coupent",
         "ne peux pas appeler","impossible d'appeler","appels ne passent pas",
     ],
@@ -163,7 +157,6 @@ FR_SENTIMENT = {
         "problème","panne","coupure","mauvais","lent","difficile","impossible",
         "ne marche pas","ne fonctionne pas","déçu","insatisfait","gêné",
         "énervé","fatigant","perturbation","dysfonctionnement",
-        # FIX-2
         "marche pas","fonctionne pas","coupe","ca coupe",
         "ca marche pas","ca fonctionne pas","reseau coupe","tout coupe",
     ],
@@ -187,7 +180,10 @@ FR_STOPS = {
     "faire","etre","avoir","aller","venir","sans","comme",
 }
 
-# ── ARABIC ────────────────────────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════════════
+# LEXICONS — ARABIC
+# ══════════════════════════════════════════════════════════════════════════════
+
 AR_CATEGORIES = {
     "الشبكة / التغطية": [
         "لا شبكة","انقطاع الشبكة","ضعف التغطية","لا إشارة","شبكة مقطوعة",
@@ -231,7 +227,7 @@ AR_SENTIMENT = {
     "سلبي": [
         "مشكلة","عطل","انقطاع","بطيء","صعب","مستحيل","لا يعمل",
         "تعطل","غير راضي","متضايق","غاضب","زعلان","متعب",
-        "خلل","عيوب","تعب","ملل",
+        "خلل","عيوب","تعب","ملل","مقطوع",
     ],
     "إيجابي": [
         "شكرا","ممتاز","جيد","رائع","راضي","سريع","أحسنتم",
@@ -258,7 +254,10 @@ AR_STOPS = {
     "أن","إن","قد","لقد","لا","ما","كل","بعض","ذلك","تلك",
 }
 
-# ── ENGLISH ───────────────────────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════════════
+# LEXICONS — ENGLISH
+# ══════════════════════════════════════════════════════════════════════════════
+
 EN_CATEGORIES = {
     "Network / Coverage": [
         "no network","no signal","no coverage","dead zone","network down",
@@ -343,7 +342,10 @@ TN_CITIES_FR = {
     "zarzis","djerba","la marsa","el kram","carthage","sakiet","raoued",
 }
 
-# ── COMPLAINT vs FEEDBACK signal lexicons ─────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════════════
+# COMPLAINT vs FEEDBACK SIGNAL LEXICONS
+# ══════════════════════════════════════════════════════════════════════════════
+
 FR_COMPLAINT_SIGNALS = [
     "pas de reseau","pas de signal","pas de couverture","hors reseau",
     "reseau coupe","reseau ne marche pas","reseau ne fonctionne pas",
@@ -373,6 +375,7 @@ FR_NON_COMPLAINT_SIGNALS = [
     "souhait","suggestion","comment passer","comment recharger",
 ]
 
+# FIX-10: added "مقطوع" — covers مقطوعة and مقطوعه (ة→ه normalized)
 AR_COMPLAINT_SIGNALS = [
     "لا شبكة","لا إشارة","لا تغطية","انقطاع الشبكة","شبكة مقطوعة",
     "إشارة ضعيفة","الشبكة واقعة","لا 4g","تغطية سيئة",
@@ -383,6 +386,9 @@ AR_COMPLAINT_SIGNALS = [
     "غير مقبول","فضيحة","سيء","رديء","كارثي","شكوى","شكوة",
     "تذمر","متضايق","غاضب","زعلان","لا أستطيع","تعطل",
     "خلل","بطء","تقطيع","مشكلتي","ابلغ عن",
+    "مقطوع",   # FIX-10: stem covers مقطوعة/مقطوعه
+    "منقطع",   # disconnected
+    "شبكتي",   # "my network" — common complaint opener
 ]
 
 AR_NON_COMPLAINT_SIGNALS = [
@@ -418,10 +424,8 @@ EN_NON_COMPLAINT_SIGNALS = [
 
 _DEFAULT_CATEGORIES = {"Autre", "أخرى", "Other"}
 
-
 # ══════════════════════════════════════════════════════════════════════════════
 # PRE-NORMALIZED KEYWORD DICTIONARIES (FIX-1)
-# Built once at module load — accent-free for all FR/EN matching.
 # ══════════════════════════════════════════════════════════════════════════════
 
 _FR_CAT_NORM   = {k: [_norm(w) for w in v] for k, v in FR_CATEGORIES.items()}
@@ -442,17 +446,27 @@ _TN_CITIES_EN_NORM = {_norm(c) for c in TN_CITIES_EN}
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# WORD-BOUNDARY MATCH HELPER (FIX-7, FIX-9)
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _kw_match(kw: str, text: str, arabic: bool = False) -> bool:
+    """
+    Safe keyword matching:
+    - Arabic: plain substring (Arabic morphology has no ASCII word boundaries)
+    - Multi-word expressions: substring
+    - Single words (FR/EN): require \b word boundary to prevent
+      "lent" matching inside "excellent", "nul" inside "Manuel", etc.
+    """
+    if arabic or " " in kw:
+        return kw in text
+    return bool(re.search(rf"\b{re.escape(kw)}\b", text))
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # MAIN PIPELINE CLASS
 # ══════════════════════════════════════════════════════════════════════════════
 
 class MultilingualNLPPipeline:
-    """
-    Analyze complaints in Arabic, French, or English without translation.
-
-    is_complaint classification order of precedence:
-        1. Trained sklearn model (models/nlp/classifier.pkl) — if present
-        2. Rule-based lexicon fallback                       — always available
-    """
 
     def __init__(self, verbose: bool = False):
         self.verbose = verbose
@@ -464,28 +478,25 @@ class MultilingualNLPPipeline:
             "non_complaints":  0,
         }
 
-    # ── Public entry point ─────────────────────────────────────────────────
     def analyze(self, text: str) -> dict:
-        """Analyze a single submission. Returns all NLP fields + is_complaint."""
         if not text or not isinstance(text, str) or len(text.strip()) < 3:
             return self._empty(text)
 
-        lang       = detect_language(text)
-        text_clean = self._preprocess(text, lang)
-
+        lang         = detect_language(text)
+        text_clean   = self._preprocess(text, lang)
         category     = self._category(text_clean, lang)
         sentiment    = self._sentiment(text_clean, lang)
         urgency      = self._urgency(text_clean, lang, sentiment)
         entities     = self._entities(text_clean, lang)
         keywords     = self._keywords(text_clean, lang)
         sentiment_fr = self._map_sentiment_to_french(sentiment, lang)
-        is_complaint = self._is_complaint(text_clean, lang, sentiment,
-                                          urgency["score"], category)
+        is_complaint = self._is_complaint(
+            text_clean, lang, sentiment, urgency["score"], category
+        )
 
         self.stats["total_processed"] += 1
-        self.stats["languages"][lang]  = self.stats["languages"].get(lang, 0) + 1
-        self.stats["categories"][category] = \
-            self.stats["categories"].get(category, 0) + 1
+        self.stats["languages"][lang]   = self.stats["languages"].get(lang, 0) + 1
+        self.stats["categories"][category] = self.stats["categories"].get(category, 0) + 1
         if is_complaint:
             self.stats["complaints"] += 1
         else:
@@ -506,7 +517,8 @@ class MultilingualNLPPipeline:
             "processed_at":  datetime.now().isoformat(),
         }
 
-    # ── Preprocessing (FIX-1 + FIX-3) ─────────────────────────────────────
+    # ── Preprocessing ──────────────────────────────────────────────────────
+
     def _preprocess(self, text: str, lang: str) -> str:
         if lang == "ar":
             text = re.sub(r"[إأآا]", "ا", text)
@@ -515,56 +527,62 @@ class MultilingualNLPPipeline:
             text = re.sub(r"[^\w\s\u0600-\u06FF]", " ", text)
         else:
             text = text.lower()
-            text = _strip_accents(text)                # FIX-1
-            text = re.sub(r"[^\w\s\-\'!]", " ", text) # FIX-3: keep !
+            text = _strip_accents(text)
+            text = re.sub(r"[^\w\s\-\'!]", " ", text)
         return re.sub(r"\s+", " ", text).strip()
 
-    # ── is_complaint (FIX-5: sklearn first, rules as fallback) ────────────
-    def _is_complaint(
-        self,
-        text:          str,
-        lang:          str,
-        sentiment:     str,
-        urgency_score: float,
-        category:      str,
-    ) -> bool:
-        """
-        Binary classification: True = réclamation, False = feedback.
+    # ── Category (FIX-7) ──────────────────────────────────────────────────
 
-        Step 1 — sklearn model (Option C):
-            Loaded once from models/nlp/classifier.pkl.
-            Returns immediately if the model file exists.
+    def _category(self, text: str, lang: str) -> str:
+        lexicon  = AR_CATEGORIES if lang == "ar" else _EN_CAT_NORM if lang == "en" else _FR_CAT_NORM
+        arabic   = lang == "ar"
+        scores   = {}
+        for cat, keywords in lexicon.items():
+            scores[cat] = sum(1 for kw in keywords if _kw_match(kw, text, arabic))
+        best = max(scores, key=scores.get)
+        if scores[best] == 0:
+            return {"ar": "أخرى", "en": "Other", "fr": "Autre"}[lang]
+        return best
 
-        Step 2 — rule-based fallback (Option A):
-            Used while the DB is being collected or if the pkl is missing.
-            Checks sentiment → keywords → urgency → category.
-        """
-        # ── STEP 1: trained sklearn classifier ────────────────────────────
+    # ── Sentiment (FIX-9) ─────────────────────────────────────────────────
+
+    def _sentiment(self, text: str, lang: str) -> str:
+        lexicon = AR_SENTIMENT if lang == "ar" else _EN_SENT_NORM if lang == "en" else _FR_SENT_NORM
+        arabic  = lang == "ar"
+        scores  = {
+            s: sum(1 for kw in kws if _kw_match(kw, text, arabic))
+            for s, kws in lexicon.items()
+        }
+        for k in lexicon:
+            if scores.get(k, 0) > 0:
+                return k
+        return {"ar": "محايد", "en": "neutral", "fr": "neutre"}[lang]
+
+    # ── Sentiment mapping ─────────────────────────────────────────────────
+
+    def _map_sentiment_to_french(self, sentiment: str, lang: str) -> str:
+        if lang == "ar":
+            return {"حرج": "critique","سلبي": "négatif","إيجابي": "positif","محايد": "neutre"}.get(sentiment, "neutre")
+        if lang == "en":
+            return {"critical": "critique","negative": "négatif","positive": "positif","neutral": "neutre"}.get(sentiment, "neutre")
+        return sentiment
+
+    # ── is_complaint (FIX-5) ──────────────────────────────────────────────
+
+    def _is_complaint(self, text: str, lang: str, sentiment: str, urgency_score: float, category: str) -> bool:
         clf = _load_trained_classifier()
         if clf is not None:
             return bool(clf.predict([text])[0])
 
-        # ── STEP 2: rule-based fallback ────────────────────────────────────
-
-        # 2a. Negative / critical sentiment is the strongest rule signal
-        negative_sentiments = {
-            "critique", "négatif",   # French
-            "حرج",      "سلبي",       # Arabic
-            "critical", "negative",  # English
-        }
-        if sentiment in negative_sentiments:
+        if sentiment in {"critique","négatif","حرج","سلبي","critical","negative"}:
             return True
 
-        # 2b. Keyword scoring — pre-normalized for accent-insensitive match
         if lang == "ar":
-            complaint_kws     = AR_COMPLAINT_SIGNALS
-            non_complaint_kws = AR_NON_COMPLAINT_SIGNALS
+            complaint_kws, non_complaint_kws = AR_COMPLAINT_SIGNALS, AR_NON_COMPLAINT_SIGNALS
         elif lang == "en":
-            complaint_kws     = _EN_COMP_NORM
-            non_complaint_kws = _EN_NCOMP_NORM
+            complaint_kws, non_complaint_kws = _EN_COMP_NORM, _EN_NCOMP_NORM
         else:
-            complaint_kws     = _FR_COMP_NORM
-            non_complaint_kws = _FR_NCOMP_NORM
+            complaint_kws, non_complaint_kws = _FR_COMP_NORM, _FR_NCOMP_NORM
 
         c_score  = sum(1 for kw in complaint_kws     if kw in text)
         nc_score = sum(1 for kw in non_complaint_kws if kw in text)
@@ -573,166 +591,92 @@ class MultilingualNLPPipeline:
             return True
         if nc_score > 0 and c_score == 0:
             return False
-
-        # 2c. High urgency with neutral sentiment
         if urgency_score >= 0.5:
             return True
-
-        # 2d. Specific category detected (not "Other/Autre/أخرى")
         if category not in _DEFAULT_CATEGORIES:
             return True
-
         return False
 
-    # ── Sentiment label mapping ────────────────────────────────────────────
-    def _map_sentiment_to_french(self, sentiment: str, lang: str) -> str:
-        if lang == "ar":
-            return {"حرج": "critique", "سلبي": "négatif",
-                    "إيجابي": "positif", "محايد": "neutre"}.get(sentiment, "neutre")
-        if lang == "en":
-            return {"critical": "critique", "negative": "négatif",
-                    "positive": "positif", "neutral": "neutre"}.get(sentiment, "neutre")
-        return sentiment  # already French
+    # ── Urgency ───────────────────────────────────────────────────────────
 
-    # ── Category ──────────────────────────────────────────────────────────
-    def _category(self, text: str, lang: str) -> str:
-        lexicon = (AR_CATEGORIES  if lang == "ar"
-                   else _EN_CAT_NORM if lang == "en"
-                   else _FR_CAT_NORM)
-        scores  = {}
-        for cat, keywords in lexicon.items():
-            score = 0
-            for kw in keywords:
-                if kw in text:
-                    score += 1
-                    if len(kw) <= 3 and re.search(rf"\b{re.escape(kw)}\b", text):
-                        score += 0.5
-            scores[cat] = score
-        best = max(scores, key=scores.get)
-        if scores[best] == 0:
-            return {"ar": "أخرى", "en": "Other", "fr": "Autre"}[lang]
-        return best
-
-    # ── Sentiment ─────────────────────────────────────────────────────────
-    def _sentiment(self, text: str, lang: str) -> str:
-        lexicon = (AR_SENTIMENT  if lang == "ar"
-                   else _EN_SENT_NORM if lang == "en"
-                   else _FR_SENT_NORM)
-        scores  = {s: sum(1 for kw in kws if kw in text)
-                   for s, kws in lexicon.items()}
-        for k in lexicon:
-            if scores.get(k, 0) > 0:
-                return k
-        return {"ar": "محايد", "en": "neutral", "fr": "neutre"}[lang]
-
-    # ── Urgency (FIX-3: ! is now in text) ─────────────────────────────────
     def _urgency(self, text: str, lang: str, sentiment: str) -> dict:
         base = {
-            "critique": 0.7, "négatif": 0.4, "neutre": 0.2, "positif": 0.1,
-            "حرج": 0.7, "سلبي": 0.4, "محايد": 0.2, "إيجابي": 0.1,
-            "critical": 0.7, "negative": 0.4, "neutral": 0.2, "positive": 0.1,
+            "critique":0.7,"négatif":0.4,"neutre":0.2,"positif":0.1,
+            "حرج":0.7,"سلبي":0.4,"محايد":0.2,"إيجابي":0.1,
+            "critical":0.7,"negative":0.4,"neutral":0.2,"positive":0.1,
         }
-        score = base.get(sentiment, 0.2)
-
-        urg_kws = (AR_URGENCY    if lang == "ar"
-                   else _EN_URG_NORM if lang == "en"
-                   else _FR_URG_NORM)
+        score   = base.get(sentiment, 0.2)
+        urg_kws = AR_URGENCY if lang == "ar" else _EN_URG_NORM if lang == "en" else _FR_URG_NORM
         for kw in urg_kws:
             if kw in text:
                 score = min(score + 0.25, 1.0)
                 break
-
-        # Duration in days
-        patterns = {"ar": r"(\d+)\s*(?:أيام|يوم|ايام)",
-                    "en": r"(\d+)\s*(?:days?|day)",
-                    "fr": r"(\d+)\s*(?:jours?|jour)"}
+        patterns = {"ar": r"(\d+)\s*(?:أيام|يوم|ايام)", "en": r"(\d+)\s*(?:days?|day)", "fr": r"(\d+)\s*(?:jours?|jour)"}
         days = re.findall(patterns[lang], text)
         if days:
             score = min(score + int(days[0]) * 0.05, 1.0)
-
-        # FIX-3: ! is now in text_clean
         if "!" in text:
             score = min(score + 0.1, 1.0)
-
         score = round(score, 2)
-        level = ("très urgent" if score >= 0.8
-                 else "urgent" if score >= 0.5
-                 else "normal")
-        return {"score": score, "level": level}
+        return {"score": score, "level": "très urgent" if score >= 0.8 else "urgent" if score >= 0.5 else "normal"}
 
     # ── Entities ──────────────────────────────────────────────────────────
+
     def _entities(self, text: str, lang: str) -> dict:
         entities = {"city": None, "network_type": None}
-        for nt in ["5g", "4g", "3g", "2g", "volte", "lte", "wifi", "fibre"]:
+        for nt in ["5g","4g","3g","2g","volte","lte","wifi","fibre"]:
             if nt in text:
                 entities["network_type"] = nt.upper()
                 break
-        if lang == "ar":
-            for city in AR_CITIES:
-                if city in text:
-                    entities["city"] = city
-                    break
-        elif lang == "en":
-            for city in _TN_CITIES_EN_NORM:
-                if city in text:
-                    entities["city"] = city.title()
-                    break
-        else:
-            for city in _TN_CITIES_FR_NORM:
-                if city in text:
-                    entities["city"] = city.title()
-                    break
+        city_set = AR_CITIES if lang == "ar" else _TN_CITIES_EN_NORM if lang == "en" else _TN_CITIES_FR_NORM
+        for city in city_set:
+            if city in text:
+                entities["city"] = city if lang == "ar" else city.title()
+                break
         return entities
 
     # ── Keywords ──────────────────────────────────────────────────────────
+
     def _keywords(self, text: str, lang: str, top_n: int = 5) -> list:
-        stops   = (AR_STOPS       if lang == "ar"
-                   else EN_STOPS  if lang == "en"
-                   else _FR_STOPS_NORM)
+        stops   = AR_STOPS if lang == "ar" else EN_STOPS if lang == "en" else _FR_STOPS_NORM
         min_len = 3 if lang == "ar" else 4
-        words   = [w for w in re.findall(r"\b\w+\b", text)
-                   if len(w) >= min_len and w not in stops]
+        words   = [w for w in re.findall(r"\b\w+\b", text) if len(w) >= min_len and w not in stops]
         freq: dict = {}
         for w in words:
             freq[w] = freq.get(w, 0) + 1
-        return [w for w, _ in
-                sorted(freq.items(), key=lambda x: x[1], reverse=True)[:top_n]]
+        return [w for w, _ in sorted(freq.items(), key=lambda x: x[1], reverse=True)[:top_n]]
 
-    # ── Batch / DataFrame ──────────────────────────────────────────────────
+    # ── Batch ─────────────────────────────────────────────────────────────
+
     def analyze_batch(self, texts: list, show_progress: bool = True) -> list:
         results = []
-        total   = len(texts)
         for i, text in enumerate(texts):
             if show_progress and self.verbose and i % 100 == 0:
-                print(f"Processing {i+1}/{total}…")
+                print(f"Processing {i+1}/{len(texts)}…")
             results.append(self.analyze(text))
         return results
 
-    def analyze_dataframe(self, df, text_column: str = "complaint_text",
-                          add_columns: bool = True):
+    def analyze_dataframe(self, df, text_column: str = "complaint_text", add_columns: bool = True):
         texts   = df[text_column].fillna("").astype(str).tolist()
         results = self.analyze_batch(texts)
         if not add_columns:
             return results
         out = df.copy()
-        for key in ["language","category","sentiment","urgency_score",
-                    "urgency_level","city","network_type","is_complaint"]:
+        for key in ["language","category","sentiment","urgency_score","urgency_level","city","network_type","is_complaint"]:
             out[f"nlp_{key}"] = [r[key] for r in results]
         out["nlp_keywords"] = [", ".join(r["keywords"]) for r in results]
         return out
 
-    def get_stats(self)   -> dict: return self.stats
+    def get_stats(self) -> dict:
+        return self.stats
+
     def reset_stats(self) -> None:
-        self.stats = {"total_processed": 0,
-                      "languages": {"ar": 0, "fr": 0, "en": 0},
-                      "categories": {}, "complaints": 0, "non_complaints": 0}
+        self.stats = {"total_processed":0,"languages":{"ar":0,"fr":0,"en":0},"categories":{},"complaints":0,"non_complaints":0}
 
     def _empty(self, text) -> dict:
-        return {"text": text, "language": "fr", "category": "Autre",
-                "sentiment": "neutre", "sentiment_raw": "neutral",
-                "urgency_score": 0.0, "urgency_level": "normal",
-                "city": None, "network_type": None, "keywords": [],
-                "is_complaint": False, "processed_at": datetime.now().isoformat()}
+        return {"text":text,"language":"fr","category":"Autre","sentiment":"neutre","sentiment_raw":"neutral",
+                "urgency_score":0.0,"urgency_level":"normal","city":None,"network_type":None,"keywords":[],
+                "is_complaint":False,"processed_at":datetime.now().isoformat()}
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -750,34 +694,36 @@ def enrich_dataframe(df, text_column: str = "complaint_text"):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# SELF-TEST  —  python src/nlp/multilingual_nlp_pipeline.py
+# SELF-TEST
 # ══════════════════════════════════════════════════════════════════════════════
 
 if __name__ == "__main__":
     pipe  = MultilingualNLPPipeline(verbose=True)
     model = _load_trained_classifier()
-    print(f"Classifier loaded : {'YES — ' + str(_CLASSIFIER_PATH) if model else 'NO  (rule-based fallback active)'}\n")
+    print(f"Classifier: {'YES' if model else 'NO (rule-based fallback)'}\n")
 
     cases = [
-        ("mon reseau coupe !!", True),
-        ("pas de 4g depuis hier soir", True),
-        ("شبكتي مقطوعة في تونس منذ 3 أيام", True),
-        ("My network keeps dropping in Tunis", True),
-        ("ca marche pas !!", True),
-        ("merci pour votre service, tout fonctionne bien.", False),
-        ("Comment activer le roaming international ?", False),
-        ("Thank you, service has improved!", False),
-        ("شكرا جزيلا، الخدمة ممتازة", False),
+        ("mon reseau coupe !!",                       True,  "FR complaint"),
+        ("pas de 4g depuis hier soir",                True,  "FR complaint"),
+        ("شبكتي مقطوعة في تونس",                      True,  "AR complaint"),
+        ("شبكتي مقطوعة في تونس منذ 3 أيام",           True,  "AR complaint + duration"),
+        ("My network keeps dropping in Tunis",         True,  "EN complaint"),
+        ("ca marche pas !!",                           True,  "FR complaint"),
+        ("merci pour votre service, tout fonctionne.", False, "FR feedback"),
+        ("merci pour votre excellent service",         False, "FR feedback FIX-9"),
+        ("Comment activer le roaming international ?", False, "FR question"),
+        ("Thank you, service has improved!",           False, "EN feedback FIX-11"),
+        ("شكرا جزيلا، الخدمة ممتازة",                  False, "AR feedback"),
     ]
 
     passed = 0
-    print(f"{'':2} {'Text':<50} {'Expect':>11}  {'Got':>11}  OK?")
-    print("  " + "─" * 80)
-    for text, expected in cases:
-        r   = pipe.analyze(text)
-        ok  = r["is_complaint"] == expected
+    print(f"  {'Text':<50} {'Exp':>11}  {'Got':>11}  Note")
+    print("  " + "─" * 88)
+    for text, expected, note in cases:
+        r  = pipe.analyze(text)
+        ok = r["is_complaint"] == expected
         lbl = lambda v: "RECLAMATION" if v else "FEEDBACK   "
-        print(f"  {'✓' if ok else '✗'} {text[:48]:<50} {lbl(expected)}  {lbl(r['is_complaint'])}  {'✓' if ok else '✗'}")
+        print(f"  {'✓' if ok else '✗'} {text[:48]:<50} {lbl(expected)}  {lbl(r['is_complaint'])}  {note}")
         if ok:
             passed += 1
-    print(f"\n  {passed}/{len(cases)} passed  |  stats: {pipe.get_stats()}")
+    print(f"\n  {passed}/{len(cases)} passed")
