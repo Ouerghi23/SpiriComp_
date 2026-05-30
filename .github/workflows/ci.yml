@@ -16,6 +16,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          cache: pip
 
       - name: Install backend dependencies
         run: |
@@ -62,6 +63,11 @@ jobs:
           assert '/api/complaints'        in paths
           print('NLP routes OK')
           "
+      - name: pip security check
+        run: |
+          pip install pip-audit
+          pip-audit --skip-editable
+        continue-on-error: true
 
   frontend:
     name: ⚛️ React build
@@ -71,6 +77,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: npm
+          cache-dependency-path: compspirit/package-lock.json
 
       - name: Install npm dependencies
         working-directory: ./compspirit
@@ -96,3 +104,7 @@ jobs:
       - name: Show build size
         working-directory: ./compspirit
         run: du -sh dist/
+      - name: npm security audit
+        working-directory: ./compspirit
+        run: npm audit --audit-level=high
+        continue-on-error: true
